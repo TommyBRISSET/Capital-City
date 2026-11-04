@@ -1,0 +1,55 @@
+{
+  "name": "capital-city",
+  "version": "1.1.1",
+  "private": true,
+  "description": "Capital City — jeu de plateau immobilier web multijoueur temps réel",
+  "engines": {
+    "node": ">=20.12.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "board-packs",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev-orchestrator.mjs",
+    "dev:web": "npm --workspace @capital-city/web run dev",
+    "dev:realtime": "npm --workspace @capital-city/realtime run dev",
+    "build:packages": "npm --workspace @capital-city/shared run build && npm --workspace @capital-city/board-packs run build && npm --workspace @capital-city/game-engine run build && npm --workspace @capital-city/ui run build",
+    "build": "npm run db:generate && npm run build:packages && npm --workspace @capital-city/realtime run build && npm --workspace @capital-city/web run build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run db:generate && npm run build:packages && npm --workspaces --if-present run typecheck",
+    "test": "node scripts/run-with-db.mjs vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "node scripts/run-with-db.mjs vitest run --coverage",
+    "test:e2e": "playwright test",
+    "db:daemon": "node scripts/pg-daemon.mjs",
+    "db:generate": "node scripts/prisma-generate-safe.mjs",
+    "db:migrate": "node scripts/run-with-db.mjs prisma migrate deploy",
+    "db:seed": "node scripts/run-with-db.mjs tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "zod": "3.24.2"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
+    "@electric-sql/pglite-socket": "0.2.18",
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.64.1",
+    "@types/node": "20.19.43",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitest/coverage-v8": "4.1.12",
+    "eslint": "9.39.5",
+    "prettier": "3.9.10",
+    "prisma": "6.19.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "4.1.12"
+  }
+}

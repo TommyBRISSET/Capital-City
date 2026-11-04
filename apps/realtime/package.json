@@ -1,0 +1,21 @@
+{
+  "name": "@capital-city/realtime",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@capital-city/board-packs": "0.1.0",
+    "@capital-city/game-engine": "0.1.0",
+    "@capital-city/shared": "0.1.0",
+    "@prisma/client": "6.19.3",
+    "ioredis": "5.11.1",
+    "socket.io": "4.8.4",
+    "zod": "3.24.2"
+  }
+}

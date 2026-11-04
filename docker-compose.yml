@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: capital_city_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-capitalcity}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-capitalcity_dev_pwd}
+      POSTGRES_DB: ${POSTGRES_DB:-capital_city}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U $${POSTGRES_USER:-capitalcity} -d $${POSTGRES_DB:-capital_city}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: capital_city_redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  realtime:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/realtime/Dockerfile
+    container_name: capital_city_realtime
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      REALTIME_PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-capitalcity}:${POSTGRES_PASSWORD:-capitalcity_dev_pwd}@postgres:5432/${POSTGRES_DB:-capital_city}?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_OPTIONAL_FALLBACK: 'false'
+      SESSION_SECRET: ${SESSION_SECRET:-replace-me-in-local-env-with-at-least-32-random-bytes-0123456789}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+    ports:
+      - '${REALTIME_PORT:-4000}:4000'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: capital_city_web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      realtime:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-capitalcity}:${POSTGRES_PASSWORD:-capitalcity_dev_pwd}@postgres:5432/${POSTGRES_DB:-capital_city}?schema=public
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-Capital City}
+      NEXT_PUBLIC_WEB_URL: ${NEXT_PUBLIC_WEB_URL:-http://localhost:3000}
+      NEXT_PUBLIC_REALTIME_URL: ${NEXT_PUBLIC_REALTIME_URL:-http://localhost:4000}
+      SESSION_SECRET: ${SESSION_SECRET:-replace-me-in-local-env-with-at-least-32-random-bytes-0123456789}
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

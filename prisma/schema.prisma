@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum RoomStatus {
+  WAITING
+  IN_GAME
+  PAUSED
+  FINISHED
+  CLOSED
+}
+
+enum GameStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
+}
+
+enum BankruptcyStatus {
+  SOLVENT
+  DEBT_PENDING
+  BANKRUPT
+}
+
+enum DeckType {
+  EVENT
+  COMMUNITY
+}
+
+enum TradeStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+model User {
+  id          String     @id @default(uuid())
+  displayName String
+  email       String?    @unique
+  avatar      String     @default("skyline-tower")
+  isGuest     Boolean    @default(true)
+  preferences Json       @default("{}")
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  hostedRooms GameRoom[] @relation("RoomHost")
+  players     Player[]
+}
+
+model BoardPack {
+  id          String       @id
+  name        String
+  subtitle    String
+  description String
+  language    String       @default("fr")
+  version     String       @default("1.0.0")
+  theme       Json
+  cardsData   Json
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  spaces      BoardSpace[]
+  rooms       GameRoom[]
+  games       Game[]
+}
+
+model BoardSpace {
+  id            String    @id @default(uuid())
+  boardPackId   String
+  spaceIndex    Int
+  spaceKey      String
+  name          String
+  type          String
+  groupCode     String?
+  price         Int       @default(0)
+  baseRent      Int       @default(0)
+  rents         Json      @default("[]")
+  houseCost     Int       @default(0)
+  mortgageValue Int       @default(0)
+  taxAmount     Int       @default(0)
+  effect        Json      @default("{}")
+
+  boardPack     BoardPack @relation(fields: [boardPackId], references: [id], onDelete: Cascade)
+
+  @@unique([boardPackId, spaceIndex])
+}
+
+model GameRoom {
+  id            String     @id @default(uuid())
+  code          String     @unique
+  name          String
+  isPublic      Boolean    @default(false)
+  hostId        String
+  boardPackId   String
+  rulesetId     String     @default("classic")
+  rulesetConfig Json
+  lobbySlots    Json       @default("[]")
+  status        RoomStatus @default(WAITING)
+  maxPlayers    Int        @default(6)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  expiresAt     DateTime?
+
+  host          User       @relation("RoomHost", fields: [hostId], references: [id])
+  boardPack     BoardPack  @relation(fields: [boardPackId], references: [id])
+  games         Game[]
+
+  @@index([code])
+  @@index([status])
+}
+
+model Game {
+  id              String     @id @default(uuid())
+  roomId          String
+  boardPackId     String
+  status          GameStatus @default(ACTIVE)
+  currentPlayerId String?
+  currentPhase    String     @default("ROLL_DICE")
+  turnNumber      Int        @default(1)
+  version         Int        @default(1)
+  stateSnapshot   Json
+  winnerPlayerId  String?
+  startedAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  endedAt         DateTime?
+
+  room            GameRoom           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  boardPack       BoardPack          @relation(fields: [boardPackId], references: [id])
+  players         Player[]
+  assets          AssetOwnership[]
+  cards           CardDeck[]
+  trades          TradeOffer[]
+  events          GameEvent[]
+  snapshots       GameSnapshot[]
+  commands        ProcessedCommand[]
+
+  @@index([roomId])
+  @@index([status])
+}
+
+model Player {
+  id               String           @id @default(uuid())
+  gameId           String
+  userId           String
+  displayName      String
+  tokenId          String
+  orderIndex       Int
+  cash             Int              @default(1500)
+  position         Int              @default(0)
+  inJail           Boolean          @default(false)
+  jailTurns        Int              @default(0)
+  heldJailCards    Int              @default(0)
+  bankruptcyStatus BankruptcyStatus @default(SOLVENT)
+  isConnected      Boolean          @default(true)
+  connectedAt      DateTime         @default(now())
+  disconnectedAt   DateTime?
+
+  game             Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user             User             @relation(fields: [userId], references: [id])
+  ownedAssets      AssetOwnership[]
+
+  @@unique([gameId, userId])
+  @@unique([gameId, orderIndex])
+}
+
+model AssetOwnership {
+  id            String   @id @default(uuid())
+  gameId        String
+  spaceIndex    Int
+  assetId       String
+  ownerPlayerId String
+  isMortgaged   Boolean  @default(false)
+  houseCount    Int      @default(0)
+  hotelCount    Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  owner         Player   @relation(fields: [ownerPlayerId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, spaceIndex])
+}
+
+model CardDeck {
+  id             String   @id @default(uuid())
+  gameId         String
+  deckType       DeckType
+  cardId         String
+  orderIndex     Int
+  effectType     String
+  effectPayload  Json
+  isHeld         Boolean  @default(false)
+  heldByPlayerId String?
+
+  game           Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, deckType, cardId])
+}
+
+model TradeOffer {
+  id              String      @id
+  gameId          String
+  proposerId      String
+  targetId        String
+  offeredAssets   Json        @default("[]")
+  requestedAssets Json        @default("[]")
+  offeredCash     Int         @default(0)
+  requestedCash   Int         @default(0)
+  offeredCards    Int         @default(0)
+  requestedCards  Int         @default(0)
+  cashDelta       Int         @default(0)
+  status          TradeStatus @default(PENDING)
+  createdAt       DateTime    @default(now())
+  expiresAt       DateTime?
+
+  game            Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, status])
+}
+
+model GameEvent {
+  id        String   @id @default(uuid())
+  gameId    String
+  sequence  Int
+  actorId   String?
+  eventType String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, sequence])
+  @@index([gameId, createdAt])
+}
+
+model GameSnapshot {
+  id              String   @id @default(uuid())
+  gameId          String
+  version         Int
+  serializedState Json
+  createdAt       DateTime @default(now())
+
+  game            Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, version])
+}
+
+model ProcessedCommand {
+  id            String   @id @default(uuid())
+  gameId        String
+  commandId     String
+  actorId       String
+  commandType   String
+  resultVersion Int
+  createdAt     DateTime @default(now())
+
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, commandId])
+}

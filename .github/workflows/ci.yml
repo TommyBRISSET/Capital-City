@@ -1,0 +1,85 @@
+name: Capital City CI
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**', 'chore/**', 'docs/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-and-tests:
+    name: Lint, Typecheck, Unit/Integration & E2E
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: capitalcity
+          POSTGRES_PASSWORD: capitalcity_dev_pwd
+          POSTGRES_DB: capital_city
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://capitalcity:capitalcity_dev_pwd@127.0.0.1:5432/capital_city?schema=public
+      REDIS_URL: redis://127.0.0.1:6379
+      REDIS_OPTIONAL_FALLBACK: 'false'
+      SESSION_SECRET: ci-test-session-secret-with-at-least-32-characters-123456
+      NEXT_PUBLIC_APP_NAME: 'Capital City'
+      NEXT_PUBLIC_WEB_URL: 'http://localhost:3000'
+      NEXT_PUBLIC_REALTIME_URL: 'http://localhost:4000'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Generate Prisma client & run SQL migrations
+        run: |
+          npm run db:generate
+          npm run db:migrate
+          npm run db:seed
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit & Integration tests + Coverage (>= 80% game-engine)
+        run: npm run test:coverage
+
+      - name: Production Build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-End Multi-Browser Tests
+        run: npm run test:e2e

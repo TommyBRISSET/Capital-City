@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js & Build outputs
+.next/
+.next-dev/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment variables & secrets (NEVER COMMIT)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Local runtime & embedded DB data
+.data/
+*.pid
+*.log
+npm-debug.log*
+
+# Testing & Coverage
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# OS, Editor & Local Tooling
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.agents/
+.claude/
+.cursor/
+.codex/
+.gemini/
+AGENTS.md
+CLAUDE.md
