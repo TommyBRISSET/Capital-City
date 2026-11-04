@@ -29,6 +29,7 @@
     "db:daemon": "node scripts/pg-daemon.mjs",
     "db:generate": "node scripts/prisma-generate-safe.mjs",
     "db:migrate": "node scripts/run-with-db.mjs prisma migrate deploy",
+    "predb:seed": "npm --workspace @capital-city/shared run build",
     "db:seed": "node scripts/run-with-db.mjs tsx prisma/seed.ts"
   },
   "dependencies": {
